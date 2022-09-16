@@ -237,8 +237,7 @@ class Graph(object):
         self.summary = summary
         ret = compile_node(self, input)
         if _model_ is not None:
-            load_model(_model_)
-            _model_ = None
+            Load(_model_)
         return ret
 
     def __show_summary(self, footer=True):
@@ -548,7 +547,7 @@ def TrainTensor(dataset_or_iterator, losses, namespaces=None, optimizers=None, e
             t = time.time()
             if total is None:
                 if t - _tprog_ > 1 or force_show:
-                    print('\rstep: {:,} -'.format(cur), msg, end='')
+                    print('\rstep: {:,} - {}\r'.format(cur, msg), end='')
                     _tprog_ = t
             else:
                 left = min(int(cur * size / total), size)
@@ -604,15 +603,16 @@ def TrainTensor(dataset_or_iterator, losses, namespaces=None, optimizers=None, e
 def Evaluate(tensor):
     return Graph.session().run(tensor)
 
-def Save(filename):
+def Save(name):
     global _saver_
     if _saver_ is None:
         _saver_ = tf.train.Saver(max_to_keep=None)
-    _saver_.save(Graph.session(), filename, write_meta_graph=False)
-    print('[+] Model was saved:', filename)
+    _saver_.save(Graph.session(), name, write_meta_graph=False)
+    print('[+] Model was saved:', name)
 
-def Load(filename):
+def Load(name):
     global _sess_, _saver_, _model_
+    _model_ = name
     sess = Graph.session()
     try:
         if _saver_ is None:
@@ -622,12 +622,15 @@ def Load(filename):
         if sess is None:
             _sess_.close()
             _sess_ = None
-        _model_ = filename
         return
-    if os.path.isdir(filename):
-        filename = tf.train.latest_checkpoint(filename)
-    _saver_.restore(_sess_, filename)
-    print('[+] Model was successfully loaded:', filename)
+    if os.path.isdir(name):
+        name = tf.train.latest_checkpoint(name)
+        if name is None:
+            print('[-] Cannot find the checkpoint in {}. Try to specify the filename of the model WITHOUT the extension.'.format(_model_))
+            exit(1)
+    _saver_.restore(_sess_, name)
+    print('[+] Model was successfully loaded:', name)
+    _model_ = None
 
 def SetRandomSeed(seed):
     global _random_seed_
