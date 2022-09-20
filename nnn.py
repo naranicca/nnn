@@ -13,7 +13,7 @@ import datetime, time
 import numpy as np
 import multiprocessing
 
-class Graph(object):
+class Model(object):
     def __init__(self, name=None, input_shape=None):
         self.__name = name
         self.func = []
@@ -74,7 +74,7 @@ class Graph(object):
             return Grahp.session().run(func_or_tensor)
         else:
             global _magiccode_
-            return Graph(name=_magiccode_).add(func_or_tensor, *args, **kwargs)
+            return Model(name=_magiccode_).add(func_or_tensor, *args, **kwargs)
 
     def name(self, name):
         global _nnnets_
@@ -135,7 +135,7 @@ class Graph(object):
         else:
             validate = callback_epoch
 
-        TrainTensor(dataset.iterator, train_loss, optimizers=optimizer, epochs=epochs, callback_epoch=validate, callback_iter=callback_iter, show_var_list=False)
+        train_tensor(dataset.iterator, train_loss, optimizers=optimizer, epochs=epochs, callback_epoch=validate, callback_iter=callback_iter, show_var_list=False)
 
     def load_weights(self, filename, trainable=True):
         self.head.__weights = [0]
@@ -231,7 +231,7 @@ class Graph(object):
             return node.tensor
         if _random_seed_ is not None and self.tensor is None:
             print('[+] Network is built with random seed =', _random_seed_)
-        # clear Graph objects
+        # clear Model objects
         for n in _nnnets_:
             n.tensor = None
         self.summary = summary
@@ -444,7 +444,7 @@ def Loss(loss, pred, label):
             import requests
             r = requests.get(url, allow_redirects=True)
             open('vgg19_weights_tf_dim_ordering_tf_kernels.h5', 'wb').write(r.content)
-        vgg = Graph('vgg')
+        vgg = Model('vgg')
         vgg = vgg.conv2d(3, 64).conv2d(3, 64).max_pool(2)
         vgg = vgg.conv2d(3, 128).conv2d(3, 128).max_pool(2)
         vgg = vgg.conv2d(3, 256).conv2d(3, 256).conv2d(3, 256).conv2d(3, 256).max_pool(2)
@@ -468,7 +468,7 @@ def Optimizer(optimizer='adam', lr=0.0001, **kwargs):
     else:
         raise Exception('Unknown optimizer: {}'.format(optimizer))
 
-def TrainTensor(dataset_or_iterator, losses, namespaces=None, optimizers=None, epochs=1, callback_epoch=None, callback_iter=None, show_var_list=True):
+def train_tensor(dataset_or_iterator, losses, namespaces=None, optimizers=None, epochs=1, callback_epoch=None, callback_iter=None, show_var_list=True):
     iterator = dataset_or_iterator
     if isinstance(dataset_or_iterator, tf.data.Dataset):
         dataset_or_iterator = Dataset(dataset_or_iterator)
@@ -488,7 +488,7 @@ def TrainTensor(dataset_or_iterator, losses, namespaces=None, optimizers=None, e
         namespaces = [namespaces]
     assert len(losses) == len(namespaces), '# of losses and # of namespaces must be equal'
 
-    sess = Graph.session()
+    sess = Model.session()
     sess.run(tf.global_variables_initializer())
 
     optimizers = [] if optimizers is None else optimizers
@@ -600,20 +600,20 @@ def TrainTensor(dataset_or_iterator, losses, namespaces=None, optimizers=None, e
                 return
     print('[+] Training finished at', datetime.datetime.now())
 
-def Evaluate(tensor):
-    return Graph.session().run(tensor)
+def evaluate(tensor):
+    return Model.session().run(tensor)
 
-def Save(name):
+def save(name):
     global _saver_
     if _saver_ is None:
         _saver_ = tf.train.Saver(max_to_keep=None)
-    _saver_.save(Graph.session(), name, write_meta_graph=False)
+    _saver_.save(Model.session(), name, write_meta_graph=False)
     print('[+] Model was saved:', name)
 
-def Load(name):
+def load(name):
     global _sess_, _saver_, _model_
     _model_ = name
-    sess = Graph.session()
+    sess = Model.session()
     try:
         if _saver_ is None:
             _saver_ = tf.train.Saver(max_to_keep=None)
@@ -632,7 +632,7 @@ def Load(name):
     print('[+] Model was successfully loaded:', name)
     _model_ = None
 
-def SetRandomSeed(seed):
+def set_random_seed(seed):
     global _random_seed_
     _random_seed_ = seed
     tf.set_random_seed(seed)
