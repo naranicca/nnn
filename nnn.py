@@ -237,7 +237,7 @@ class Model(object):
         self.summary = summary
         ret = compile_node(self, input)
         if _model_ is not None:
-            Load(_model_)
+            load(_model_)
         return ret
 
     def __show_summary(self, footer=True):
