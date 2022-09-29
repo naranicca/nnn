@@ -32,6 +32,9 @@ class Model(object):
             assert not input in tf.global_variables(), 'This tensor is not acceptable: Try to set trainable parameter of variable() to False'
             return self.__build_network(input)
         else:
+            global _feed_dict_
+            t = _feed_dict_[_training_]
+            _feed_dict_.update({_training_: False})
             try:
                 if not 'testnet' in self.__dict__:
                     if 'input_shape' in self.head.__dict__:
@@ -41,11 +44,13 @@ class Model(object):
                     x = tf.placeholder(tf.float32, shape=shape)
                     self.testnet = self.__build_network(x, silent=True)
                     print('[+] The network for test was built successfully: input_shape =', shape)
-                return self.session().run(self.testnet, feed_dict=merge_feed_dict({_training_: False, x: input}))
+                ret = self.session().run(self.testnet, feed_dict=_feed_dict_)
             except Exception as e:
                 x = tf.constant(input)
                 y = self.__build_network(x, silent=True)
-                return self.session().run(y, feed_dict=merge_feed_dict({_training_: False}))
+                ret = self.session().run(y, feed_dict=_feed_dict_)
+            _feed_dict_.update({_training_: t})
+            return ret
 
     def __str__(self):
         if hasattr(self, 'summary'):
@@ -123,13 +128,17 @@ class Model(object):
             def validate(epoch):
                 self.session().run(validset.iterator.initializer)
                 loss, cnt = 0, 0
+                global _feed_dict_
+                t = _feed_dict_[_training_]
+                _feed_dict_.update({_training_: False})
                 while True:
                     try:
-                        loss = loss + self.session().run(valid_loss, feed_dict=merge_feed_dict({_training_: False}))
+                        loss = loss + self.session().run(valid_loss, feed_dict=_feed_dict_))
                         cnt = cnt + 1
                     except:
                         break
                 print('    validation loss:', loss / cnt)
+                _feed_dict_.update({_training_: t})
                 if callback_epoch:
                     return callback_epoch(epoch)
         else:
@@ -562,13 +571,16 @@ def train_tensor(dataset_or_iterator, losses, namespaces=None, optimizers=None, 
         total_losses = [0] * len(losses)
         ee = (tf.errors.OutOfRangeError)
         lmsg = '{}/{}'.format(epoch+1, epochs)
+        global _feed_dict_
+        t = _feed_dict_[_training_]
+        _feed_dict_.update({_training_: True})
         for loss_idx, _ in enumerate(losses):
             sess.run(iterator.initializer)
             while True:
                 try:
                     ll = []
                     for op, l in zip(optimizers, losses):
-                        _, loss = sess.run([op, l], feed_dict=merge_feed_dict({_training_: True}))
+                        _, loss = sess.run([op, l], feed_dict=_feed_dict_)
                         ll.append(loss)
                     if len(ll) == len(losses):
                         loss_list = 'loss: {}'.format(ll[0] if len(ll) == 1 else tuple(ll))
@@ -584,6 +596,7 @@ def train_tensor(dataset_or_iterator, losses, namespaces=None, optimizers=None, 
                         print('[-] Training was aborted at iteration = {}'.format(iter))
                         return
                 ee = (tf.errors.OutOfRangeError, tf.errors.InvalidArgumentError)
+        _feed_dict_.update({_training_: t})
         size = i
         assert size > 0, 'No data to train'
         telapsed = (time.time() - tbeg)
@@ -636,12 +649,6 @@ def set_random_seed(seed):
     global _random_seed_
     _random_seed_ = seed
     tf.set_random_seed(seed)
-
-def merge_feed_dict(feed_dict):
-    global _feed_dict_
-    copy = _feed_dict_.copy()
-    copy.update(feed_dict)
-    return copy
 
 # colorize logs
 try:
