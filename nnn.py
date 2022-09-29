@@ -32,6 +32,9 @@ class Model(object):
             assert not input in tf.global_variables(), 'This tensor is not acceptable: Try to set trainable parameter of variable() to False'
             return self.__build_network(input)
         else:
+            global _feed_dict_
+            t = _feed_dict_.get(_training_)
+            _feed_dict_.update({_training_: False})
             try:
                 if not 'testnet' in self.__dict__:
                     if 'input_shape' in self.head.__dict__:
@@ -41,11 +44,13 @@ class Model(object):
                     x = tf.placeholder(tf.float32, shape=shape)
                     self.testnet = self.__build_network(x, silent=True)
                     print('[+] The network for test was built successfully: input_shape =', shape)
-                return self.session().run(self.testnet, feed_dict=merge_feed_dict({_training_: False, x: input}))
+                ret = self.session().run(self.testnet, feed_dict=_feed_dict_)
             except Exception as e:
                 x = tf.constant(input)
                 y = self.__build_network(x, silent=True)
-                return self.session().run(y, feed_dict=merge_feed_dict({_training_: False}))
+                ret = self.session().run(y, feed_dict=_feed_dict_)
+            _feed_dict_.update({_training_: t})
+            return ret
 
     def __str__(self):
         if hasattr(self, 'summary'):
@@ -123,13 +128,17 @@ class Model(object):
             def validate(epoch):
                 self.session().run(validset.iterator.initializer)
                 loss, cnt = 0, 0
+                global _feed_dict_
+                t = _feed_dict_.get(_training_)
+                _feed_dict_.update({_training_: False})
                 while True:
                     try:
-                        loss = loss + self.session().run(valid_loss, feed_dict=merge_feed_dict({_training_: False}))
+                        loss = loss + self.session().run(valid_loss, feed_dict=_feed_dict_)
                         cnt = cnt + 1
                     except:
                         break
                 print('    validation loss:', loss / cnt)
+                _feed_dict_.update({_training_: t})
                 if callback_epoch:
                     return callback_epoch(epoch)
         else:
@@ -237,7 +246,7 @@ class Model(object):
         self.summary = summary
         ret = compile_node(self, input)
         if _model_ is not None:
-            Load(_model_)
+            load(_model_)
         return ret
 
     def __show_summary(self, footer=True):
@@ -541,20 +550,21 @@ def train_tensor(dataset_or_iterator, losses, namespaces=None, optimizers=None, 
     print('[+] Training started at', datetime.datetime.now())
     size = dataset.size
     iter = 0
-    def show_progress(cur, total, msg, size=15, lmsg=None, force_show=False):
+    def show_progress(cur, total, msg, size=15, lmsg=None, cr=False):
         global _tprog_
-        if os.fstat(0) == os.fstat(1):
+        if os.fstat(0) == os.fstat(1) or cr:
             t = time.time()
             if total is None:
-                if t - _tprog_ > 1 or force_show:
+                if t - _tprog_ > 1 or cr:
                     print('\rstep: {:,} - {}\r'.format(cur, msg), end='')
                     _tprog_ = t
             else:
                 left = min(int(cur * size / total), size)
-                if t - _tprog_ > 1 or force_show:
+                if t - _tprog_ > 1 or cr:
                     if lmsg is None:
                         lmsg = '{:,}/{:,}'.format(cur, total)
-                    print('\r{} [{}{}] {}\r'.format(lmsg, '#'*left, ' '*(size-left), msg), end='')
+                    cr = '\n' if cr else '\r'
+                    print('\r{} [{}{}] {}\033[K'.format(lmsg, '#'*left, ' '*(size-left), msg), end=cr)
                     _tprog_ = t
     for epoch in range(epochs):
         tbeg = time.time()
@@ -562,33 +572,37 @@ def train_tensor(dataset_or_iterator, losses, namespaces=None, optimizers=None, 
         total_losses = [0] * len(losses)
         ee = (tf.errors.OutOfRangeError)
         lmsg = '{}/{}'.format(epoch+1, epochs)
+        global _feed_dict_
+        t = _feed_dict_.get(_training_)
+        _feed_dict_.update({_training_: True})
         for loss_idx, _ in enumerate(losses):
             sess.run(iterator.initializer)
             while True:
                 try:
                     ll = []
                     for op, l in zip(optimizers, losses):
-                        _, loss = sess.run([op, l], feed_dict=merge_feed_dict({_training_: True}))
+                        _, loss = sess.run([op, l], feed_dict=_feed_dict_)
                         ll.append(loss)
                     if len(ll) == len(losses):
                         loss_list = 'loss: {}'.format(ll[0] if len(ll) == 1 else tuple(ll))
                 except ee:
                     break
-                show_progress(i+1, size, '{:.1f}s, {}  '.format(time.time() - tbeg, loss_list), lmsg=lmsg)
+                show_progress(i+1, size, '{:.1f}s, {}'.format(time.time() - tbeg, loss_list), lmsg=lmsg)
                 i = i + 1
                 iter = iter + 1
                 total_losses[loss_idx] = total_losses[loss_idx] + loss
                 if callback_iter:
                     if callback_iter(iter) == False:
-                        show_progress(i, size, msg='{:.1f}s, {}  \n'.format(time.time() - tbeg, loss_list), lmsg=lmsg, force_show=True)
+                        show_progress(i, size, msg='{:.1f}s, {}'.format(time.time() - tbeg, loss_list), lmsg=lmsg, cr=True)
                         print('[-] Training was aborted at iteration = {}'.format(iter))
                         return
                 ee = (tf.errors.OutOfRangeError, tf.errors.InvalidArgumentError)
+        _feed_dict_.update({_training_: t})
         size = i
         assert size > 0, 'No data to train'
         telapsed = (time.time() - tbeg)
         lmsg = '{}/{}'.format(epoch+1, epochs)
-        show_progress(i+1, i+1, msg='{:.1f}s, {}  \n'.format(telapsed, loss_list), lmsg=lmsg, force_show=True)
+        show_progress(i+1, i+1, msg='{:.1f}s'.format(telapsed), lmsg=lmsg, cr=True)
         lmsg = ' ' * len(lmsg)
         print(lmsg, '- Iterations: {:,} ({:.1f} steps/s)'.format(size, float(size) / telapsed))
         print(lmsg, '- Total iterations: {:,}'.format(iter))
@@ -636,12 +650,6 @@ def set_random_seed(seed):
     global _random_seed_
     _random_seed_ = seed
     tf.set_random_seed(seed)
-
-def merge_feed_dict(feed_dict):
-    global _feed_dict_
-    copy = _feed_dict_.copy()
-    copy.update(feed_dict)
-    return copy
 
 # colorize logs
 try:
