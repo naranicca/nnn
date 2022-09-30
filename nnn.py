@@ -33,7 +33,7 @@ class Model(object):
             return self.__build_network(input)
         else:
             global _feed_dict_
-            t = _feed_dict_[_training_]
+            t = _feed_dict_.get(_training_)
             _feed_dict_.update({_training_: False})
             try:
                 if not 'testnet' in self.__dict__:
@@ -129,11 +129,11 @@ class Model(object):
                 self.session().run(validset.iterator.initializer)
                 loss, cnt = 0, 0
                 global _feed_dict_
-                t = _feed_dict_[_training_]
+                t = _feed_dict_.get(_training_)
                 _feed_dict_.update({_training_: False})
                 while True:
                     try:
-                        loss = loss + self.session().run(valid_loss, feed_dict=_feed_dict_))
+                        loss = loss + self.session().run(valid_loss, feed_dict=_feed_dict_)
                         cnt = cnt + 1
                     except:
                         break
@@ -552,7 +552,7 @@ def train_tensor(dataset_or_iterator, losses, namespaces=None, optimizers=None, 
     iter = 0
     def show_progress(cur, total, msg, size=15, lmsg=None, force_show=False):
         global _tprog_
-        if os.fstat(0) == os.fstat(1):
+        if os.fstat(0) == os.fstat(1) or force_show:
             t = time.time()
             if total is None:
                 if t - _tprog_ > 1 or force_show:
@@ -563,7 +563,7 @@ def train_tensor(dataset_or_iterator, losses, namespaces=None, optimizers=None, 
                 if t - _tprog_ > 1 or force_show:
                     if lmsg is None:
                         lmsg = '{:,}/{:,}'.format(cur, total)
-                    print('\r{} [{}{}] {}\r'.format(lmsg, '#'*left, ' '*(size-left), msg), end='')
+                    print('\r{} [{}{}] {}\033[K\r'.format(lmsg, '#'*left, ' '*(size-left), msg), end='')
                     _tprog_ = t
     for epoch in range(epochs):
         tbeg = time.time()
@@ -572,7 +572,7 @@ def train_tensor(dataset_or_iterator, losses, namespaces=None, optimizers=None, 
         ee = (tf.errors.OutOfRangeError)
         lmsg = '{}/{}'.format(epoch+1, epochs)
         global _feed_dict_
-        t = _feed_dict_[_training_]
+        t = _feed_dict_.get(_training_)
         _feed_dict_.update({_training_: True})
         for loss_idx, _ in enumerate(losses):
             sess.run(iterator.initializer)
@@ -586,13 +586,13 @@ def train_tensor(dataset_or_iterator, losses, namespaces=None, optimizers=None, 
                         loss_list = 'loss: {}'.format(ll[0] if len(ll) == 1 else tuple(ll))
                 except ee:
                     break
-                show_progress(i+1, size, '{:.1f}s, {}  '.format(time.time() - tbeg, loss_list), lmsg=lmsg)
+                show_progress(i+1, size, '{:.1f}s, {}'.format(time.time() - tbeg, loss_list), lmsg=lmsg)
                 i = i + 1
                 iter = iter + 1
                 total_losses[loss_idx] = total_losses[loss_idx] + loss
                 if callback_iter:
                     if callback_iter(iter) == False:
-                        show_progress(i, size, msg='{:.1f}s, {}  \n'.format(time.time() - tbeg, loss_list), lmsg=lmsg, force_show=True)
+                        show_progress(i, size, msg='{:.1f}s, {}\n'.format(time.time() - tbeg, loss_list), lmsg=lmsg, force_show=True)
                         print('[-] Training was aborted at iteration = {}'.format(iter))
                         return
                 ee = (tf.errors.OutOfRangeError, tf.errors.InvalidArgumentError)
@@ -601,7 +601,7 @@ def train_tensor(dataset_or_iterator, losses, namespaces=None, optimizers=None, 
         assert size > 0, 'No data to train'
         telapsed = (time.time() - tbeg)
         lmsg = '{}/{}'.format(epoch+1, epochs)
-        show_progress(i+1, i+1, msg='{:.1f}s, {}  \n'.format(telapsed, loss_list), lmsg=lmsg, force_show=True)
+        show_progress(i+1, i+1, msg='{:.1f}s, {}\n'.format(telapsed, loss_list), lmsg=lmsg, force_show=True)
         lmsg = ' ' * len(lmsg)
         print(lmsg, '- Iterations: {:,} ({:.1f} steps/s)'.format(size, float(size) / telapsed))
         print(lmsg, '- Total iterations: {:,}'.format(iter))
