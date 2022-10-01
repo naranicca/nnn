@@ -550,20 +550,21 @@ def train_tensor(dataset_or_iterator, losses, namespaces=None, optimizers=None, 
     print('[+] Training started at', datetime.datetime.now())
     size = dataset.size
     iter = 0
-    def show_progress(cur, total, msg, size=15, lmsg=None, force_show=False):
+    def show_progress(cur, total, msg, size=15, lmsg=None, cr=False):
         global _tprog_
-        if os.fstat(0) == os.fstat(1) or force_show:
+        if os.fstat(0) == os.fstat(1) or cr:
             t = time.time()
             if total is None:
-                if t - _tprog_ > 1 or force_show:
+                if t - _tprog_ > 1 or cr:
                     print('\rstep: {:,} - {}\r'.format(cur, msg), end='')
                     _tprog_ = t
             else:
                 left = min(int(cur * size / total), size)
-                if t - _tprog_ > 1 or force_show:
+                if t - _tprog_ > 1 or cr:
                     if lmsg is None:
                         lmsg = '{:,}/{:,}'.format(cur, total)
-                    print('\r{} [{}{}] {}\033[K\r'.format(lmsg, '#'*left, ' '*(size-left), msg), end='')
+                    cr = '\n' if cr else '\r'
+                    print('\r{} [{}{}] {}\033[K'.format(lmsg, '#'*left, ' '*(size-left), msg), end=cr)
                     _tprog_ = t
     for epoch in range(epochs):
         tbeg = time.time()
@@ -592,7 +593,7 @@ def train_tensor(dataset_or_iterator, losses, namespaces=None, optimizers=None, 
                 total_losses[loss_idx] = total_losses[loss_idx] + loss
                 if callback_iter:
                     if callback_iter(iter) == False:
-                        show_progress(i, size, msg='{:.1f}s, {}\n'.format(time.time() - tbeg, loss_list), lmsg=lmsg, force_show=True)
+                        show_progress(i, size, msg='{:.1f}s, {}'.format(time.time() - tbeg, loss_list), lmsg=lmsg, cr=True)
                         print('[-] Training was aborted at iteration = {}'.format(iter))
                         return
                 ee = (tf.errors.OutOfRangeError, tf.errors.InvalidArgumentError)
@@ -601,7 +602,7 @@ def train_tensor(dataset_or_iterator, losses, namespaces=None, optimizers=None, 
         assert size > 0, 'No data to train'
         telapsed = (time.time() - tbeg)
         lmsg = '{}/{}'.format(epoch+1, epochs)
-        show_progress(i+1, i+1, msg='{:.1f}s, {}\n'.format(telapsed, loss_list), lmsg=lmsg, force_show=True)
+        show_progress(i+1, i+1, msg='{:.1f}s'.format(telapsed), lmsg=lmsg, cr=True)
         lmsg = ' ' * len(lmsg)
         print(lmsg, '- Iterations: {:,} ({:.1f} steps/s)'.format(size, float(size) / telapsed))
         print(lmsg, '- Total iterations: {:,}'.format(iter))
