@@ -1,4 +1,4 @@
-from nnn import print, Model, evaluate
+from nnn import print, Model, Variable
 
 print('-- Regression --')
 func = lambda x: 2*x*x - 4*x + 3
