@@ -20,7 +20,6 @@ class Model(object):
         self.tensor = None
         self.head = self
         self.idx = 0
-        self.__weights = []
         if input_shape is not None:
             self.input_shape = [None] + list(input_shape)
         global _nnnets_
@@ -57,21 +56,6 @@ class Model(object):
             return '{}'.format(self.__show_summary())
         else:
             return self.__repr__()
-
-    def get_variable(self, name, shape=()):
-        if len(self.head.__weights) > 0:
-            i = self.head.__weights[0]
-            w = self.head.__weights[i]
-            self.head.__weights[0] = i + 1
-            assert type(w) != str, 'Failed to load weights {}: Weights and the network do not match'.format(name)
-            return w if isinstance(w, tf.Tensor) else tf.convert_to_tensor(w, name=name)
-        else:
-            global _random_seed_
-            if list(map(int, tf.__version__.split('.')))[0] == 1:
-                initializer = tf.contrib.layers.variance_scaling_initializer('FAN_AVG', seed=_random_seed_)
-            else:
-                initializer = tf.truncated_normal_initializer(stddev=0.1, seed=_random_seed_)
-            return tf.get_variable(name, shape=shape, initializer=initializer)
 
     @staticmethod
     def calc(func_or_tensor, *args, **kwargs):
@@ -149,20 +133,20 @@ class Model(object):
 
         train_tensor(dataset.iterator, train_loss, optimizers=optimizer, epochs=epochs, callback_epoch=validate, callback_iter=callback_iter, show_var_list=False)
 
-    def load_weights(self, filename, trainable=True):
-        self.head.__weights = [0]
-        assert filename.endswith('.h5'), 'Only .h5 files are supported'
-        import h5py
-        with h5py.File(filename, 'r') as f:
-            for key in f.keys():
-                group = f[key]
-                for g in list(group):
-                    v = group[g][()]
-                    if trainable:
-                        self.head.__weights.append(tf.constant(v, tf.float32))
-                    else:
-                        self.head.__weights.append(v)
-        self.head.__weights.append(filename)
+    #def load_weights(self, filename, trainable=True):
+    #    self.head.__weights = [0]
+    #    assert filename.endswith('.h5'), 'Only .h5 files are supported'
+    #    import h5py
+    #    with h5py.File(filename, 'r') as f:
+    #        for key in f.keys():
+    #            group = f[key]
+    #            for g in list(group):
+    #                v = group[g][()]
+    #                if trainable:
+    #                    self.head.__weights.append(tf.constant(v, tf.float32))
+    #                else:
+    #                    self.head.__weights.append(v)
+    #    self.head.__weights.append(filename)
 
     def __build_network(self, input, silent=False):
         global _magiccode_, _nnnets_, _model_, _random_seed_
@@ -170,8 +154,6 @@ class Model(object):
             tf.set_random_seed(_random_seed_)
             np.random.seed(_random_seed_)
         summary = []
-        if len(self.head.__weights) > 0:
-            self.head.__weights[0] = 1
         def compile_node(node, input):
             if node.tensor is None:
                 if node.func:
@@ -312,8 +294,8 @@ class Model(object):
         def conv2d(x, activation=activation):
             x = self.reshape_nhwc(x)
             c = x.get_shape().as_list()[-1]
-            w = self.get_variable('W', shape=(kernel_size, kernel_size, c, out_channels))
-            b = self.get_variable('b', shape=(out_channels)) if bias else 0
+            w = Variable('W', shape=(kernel_size, kernel_size, c, out_channels))
+            b = Variable('b', shape=(out_channels)) if bias else 0
             out = tf.nn.conv2d(x, w, strides=[1, stride, stride, 1], padding='SAME') + b
             if activation:
                 return activation(out)
@@ -446,26 +428,26 @@ def Loss(loss, pred, label):
         if len(label.get_shape().as_list()) == 0:
             label = tf.broadcast_to(label, pred.get_shape().as_list())
         return tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(labels=tf.cast(label, tf.float32), logits=pred))
-    elif loss == 'vgg' or loss == 'vgg19':
-        mean = [103.939, 116.779, 123.68]
-        pred = pred[..., ::-1] - mean
-        label = label[..., ::-1] - mean
-        if not os.path.exists('vgg19_weights_tf_dim_ordering_tf_kernels.h5'):
-            url = 'https://github.com/fchollet/deep-learning-models/releases/download/v0.1/vgg19_weights_tf_dim_ordering_tf_kernels.h5'
-            print('[*] VGG model was not found. Downloading from:', url)
-            import requests
-            r = requests.get(url, allow_redirects=True)
-            open('vgg19_weights_tf_dim_ordering_tf_kernels.h5', 'wb').write(r.content)
-        vgg = Model('vgg')
-        vgg = vgg.conv2d(3, 64).conv2d(3, 64).max_pool(2)
-        vgg = vgg.conv2d(3, 128).conv2d(3, 128).max_pool(2)
-        vgg = vgg.conv2d(3, 256).conv2d(3, 256).conv2d(3, 256).conv2d(3, 256).max_pool(2)
-        vgg = vgg.conv2d(3, 512).conv2d(3, 512).conv2d(3, 512).conv2d(3, 512).max_pool(2)
-        vgg = vgg.conv2d(3, 512).conv2d(3, 512).conv2d(3, 512).conv2d(3, 512, activation=None)
-        vgg.load_weights('vgg19_weights_tf_dim_ordering_tf_kernels.h5', trainable=False)
-        pred = vgg(pred)
-        label = vgg(label)
-        return tf.reduce_mean(tf.square(label - pred))
+    #elif loss == 'vgg' or loss == 'vgg19':
+    #    mean = [103.939, 116.779, 123.68]
+    #    pred = pred[..., ::-1] - mean
+    #    label = label[..., ::-1] - mean
+    #    if not os.path.exists('vgg19_weights_tf_dim_ordering_tf_kernels.h5'):
+    #        url = 'https://github.com/fchollet/deep-learning-models/releases/download/v0.1/vgg19_weights_tf_dim_ordering_tf_kernels.h5'
+    #        print('[*] VGG model was not found. Downloading from:', url)
+    #        import requests
+    #        r = requests.get(url, allow_redirects=True)
+    #        open('vgg19_weights_tf_dim_ordering_tf_kernels.h5', 'wb').write(r.content)
+    #    vgg = Model('vgg')
+    #    vgg = vgg.conv2d(3, 64).conv2d(3, 64).max_pool(2)
+    #    vgg = vgg.conv2d(3, 128).conv2d(3, 128).max_pool(2)
+    #    vgg = vgg.conv2d(3, 256).conv2d(3, 256).conv2d(3, 256).conv2d(3, 256).max_pool(2)
+    #    vgg = vgg.conv2d(3, 512).conv2d(3, 512).conv2d(3, 512).conv2d(3, 512).max_pool(2)
+    #    vgg = vgg.conv2d(3, 512).conv2d(3, 512).conv2d(3, 512).conv2d(3, 512, activation=None)
+    #    vgg.load_weights('vgg19_weights_tf_dim_ordering_tf_kernels.h5', trainable=False)
+    #    pred = vgg(pred)
+    #    label = vgg(label)
+    #    return tf.reduce_mean(tf.square(label - pred))
     elif callable(loss):
         return loss(pred, label)
     elif isinstance(loss, tf.Tensor):
@@ -479,6 +461,53 @@ def Optimizer(optimizer='adam', lr=0.0001, **kwargs):
         return tf.train.AdamOptimizer(lr, **kwargs)
     else:
         raise Exception('Unknown optimizer: {}'.format(optimizer))
+
+def Variable(var, shape=None):
+    """ Variable is a trainable variable whose value cannot be changed by the user
+    To create a variable var:
+    >>> var = Variable('name', shape=(3, 3))
+
+    If 'name' exists, existing variable with the name is retrieved
+
+    To get the current value of a variable var:
+    >>> Variable(var)
+    """
+    if type(var) == str:
+        t = [v for v in tf.global_variables() if v.op.name == var]
+        if len(var) > 0:
+            return v[0]
+        global _random_seed_
+        if list(map(int, tf.__version__.split('.')))[0] == 1:
+            initializer = tf.contrib.layers.variance_scaling_initializer('FAN_AVG', seed=_random_seed_)
+        else:
+            initializer = tf.truncated_normal_initializer(stddev=0.1, seed=_random_seed_)
+        return tf.get_variable(name=var, shape=shape if shape else (), initializer=initializer)
+    else:
+        return Model.session().run(var)
+
+def Parameter(param, new_value=None):
+    """ Parameter is non-trainable variable that the user can chane on the fly
+    To create a parameter foo:
+    >>> foo = Parameter(1.0)
+
+    To get the value of a parameter foo:
+    >>> Parameter(foo)
+    1.0
+
+    To change the value of a parameter foo:
+    >>> Parameter(foo, 2.0)
+    2.0
+    """
+    global _feed_dict_
+    if param is in _feed_dict_:
+        if new_value:
+            _feed_dict_.update({param: new_value})
+        return _feed_dict_[param]
+    else:
+        assert new_value is None, 'Cannot find the parameter to be set to the new value'
+        p = tf.placeholder(tf.float32, shape=np.array(param).shape)
+        _feed_dict_.update({p: param})
+        return p
 
 def train_tensor(dataset_or_iterator, losses, namespaces=None, optimizers=None, epochs=1, callback_epoch=None, callback_iter=None, show_var_list=True):
     iterator = dataset_or_iterator
@@ -616,9 +645,6 @@ def train_tensor(dataset_or_iterator, losses, namespaces=None, optimizers=None, 
                 print('[-] Training was aborted at epoch = {}'.format(epoch+1))
                 return
     print('[+] Training finished at', datetime.datetime.now())
-
-def evaluate(tensor):
-    return Model.session().run(tensor)
 
 def save(name):
     global _saver_
