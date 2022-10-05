@@ -9,9 +9,12 @@ try:
     tf.disable_v2_behavior()
 except:
     import tensorflow as tf
+import re
 import datetime, time
 import numpy as np
 import multiprocessing
+import pydoc
+pydoc.pager = pydoc.plainpager
 
 class Model(object):
     def __init__(self, name=None, input_shape=None):
@@ -43,24 +46,24 @@ class Model(object):
                     x = tf.placeholder(tf.float32, shape=shape)
                     self.testnet = self.__build_network(x, silent=True)
                     print('[+] The network for test was built successfully: input_shape =', shape)
-                ret = self.session().run(self.testnet, feed_dict=_feed_dict_)
+                ret = Session().run(self.testnet, feed_dict=_feed_dict_)
             except Exception as e:
                 x = tf.constant(input)
                 y = self.__build_network(x, silent=True)
-                ret = self.session().run(y, feed_dict=_feed_dict_)
+                ret = Session().run(y, feed_dict=_feed_dict_)
             _feed_dict_.update({_training_: t})
             return ret
 
     def __str__(self):
         if hasattr(self, 'summary'):
-            return '{}'.format(self.__show_summary())
+            return '{}'.format(self.show_summary())
         else:
             return self.__repr__()
 
     @staticmethod
     def calc(func_or_tensor, *args, **kwargs):
         if isinstance(func_or_tensor, tf.Tensor):
-            return Grahp.session().run(func_or_tensor)
+            return Session().run(func_or_tensor)
         else:
             global _magiccode_
             return Model(name=_magiccode_).add(func_or_tensor, *args, **kwargs)
@@ -104,7 +107,7 @@ class Model(object):
         output, labels = self.__call__(dataset.input), dataset.label
 
         print('[+] Summary of the network')
-        self.__show_summary()
+        self.show_summary()
 
         train_loss = Loss(loss, output, labels)
 
@@ -113,14 +116,14 @@ class Model(object):
             valid_output, valid_label = self.__call__(validset.input), validset.label
             valid_loss = Loss(loss, valid_output, valid_label)
             def validate(epoch):
-                self.session().run(validset.iterator.initializer)
+                Session().run(validset.iterator.initializer)
                 loss, cnt = 0, 0
                 global _feed_dict_
                 t = _feed_dict_.get(_training_)
                 _feed_dict_.update({_training_: False})
                 while True:
                     try:
-                        loss = loss + self.session().run(valid_loss, feed_dict=_feed_dict_)
+                        loss = loss + Session().run(valid_loss, feed_dict=_feed_dict_)
                         cnt = cnt + 1
                     except:
                         break
@@ -195,7 +198,7 @@ class Model(object):
                                 node.tensor = func(*args, **kwargs)
                             except Exception as e:
                                 if not silent:
-                                    self.__show_summary(footer=False)
+                                    self.show_summary(footer=False)
                                     print(node.__name)
                                     print(str(e))
                                 raise
@@ -234,7 +237,7 @@ class Model(object):
             load(_model_)
         return ret
 
-    def __show_summary(self, footer=True):
+    def show_summary(self, footer=True):
         nlen, plen = 0, 0
         for s in self.summary:
             nlen, plen = max(len(s['name'])+1, nlen), max(len(s['param'])+1, plen)
@@ -253,13 +256,6 @@ class Model(object):
         print((nf+' {:20} {:,}').format('output', '{}'.format(self.tensor.get_shape()), num_params))
         total_params = int(sum(np.prod(v.get_shape().as_list()) for v in tf.trainable_variables()))
         print('-'*mlen)
-
-    @staticmethod
-    def session():
-        global _sess_
-        if _sess_ is None:
-            _sess_ = tf.Session()
-        return _sess_
 
     # operator overloading
     def __add__(self, o):
@@ -314,10 +310,10 @@ class Model(object):
     def concat(self, x, axis=-1):
         return self.add(tf.concat, [self, x], axis=axis)
 
-    def slice(self, start, stop):
+    def slice(self, start, stop=None):
         def slice(x, start, stop):
             return x[..., start:stop]
-        return self.add(slice, self, start, stop)
+        return self.add(slice, self, start, stop if stop else start+1)
 
     def flatten(self):
         return self.add(tf.layers.flatten, self)
@@ -471,8 +467,15 @@ def Variable(var, shape=None):
 
     To get the current value of a variable var:
     >>> Variable(var)
+
+    All trainable variables are retrieve if var is None
+    >>> all_var = Variable(None)
     """
-    if type(var) == str:
+    if var is None:
+        return tf.trainable_variables()
+    elif isinstance(var, tf.Variable):
+        return Session().run(var)
+    elif type(var) == str:
         t = [v for v in tf.global_variables() if v.op.name == var]
         if len(t) > 0:
             return t[0]
@@ -483,7 +486,7 @@ def Variable(var, shape=None):
             initializer = tf.truncated_normal_initializer(stddev=0.1, seed=_random_seed_)
         return tf.get_variable(name=var, shape=shape if shape else (), initializer=initializer)
     else:
-        return Model.session().run(var)
+        raise TypeError(Variable.__doc__)
 
 def Parameter(param, new_value=None):
     """ Parameter is a non-trainable variable that the user can change on the fly
@@ -509,6 +512,53 @@ def Parameter(param, new_value=None):
         _feed_dict_.update({p: param})
         return p
 
+class Logger(object):
+    def __init__(self, dir):
+        global _logger_
+        _logger_ = self
+        self.writer = tf.summary.FileWriter(dir)
+        print('[+] Tensorboard data will be saved:', dir)
+    def add_scalar(self, tag, index, value):
+        s = tf.Summary(value=[tf.Summary.Value(tag=tag, simple_value=value)])
+        self.writer.add_summary(s, index)
+    def add_histogram(self, tag, index, values, bins=1000):
+        cnt, bins = np.histogram(values, bins=bins)
+        hist = tf.HistogramProto()
+        hist.min = float(np.min(values))
+        hist.max = float(np.max(values))
+        hist.num = int(np.prod(values.shape))
+        hist.sum = float(np.sum(values))
+        hist.sum_squares = float(np.sum(values**2))
+        for edge in bins[1:]:
+            hist.bucket_limit.append(edge)
+        for c in cnt:
+            hist.bucket.append(c)
+        s = tf.Summary(value=[tf.Summary.Value(tag=tag, histo=hist)])
+        self.writer.add_summary(s, index)
+    def add_image(self, tag, index, rgb_images):
+        images = rgb_images
+        min, max = np.min(images), np.max(images)
+        if min >= 0 and max <= 1:
+            images = images * 255
+        elif min >= -1 and max <= 1:
+            images = (images + 1) * 127.5
+        images = np.clip(np.round(images).astype(np.uint8), 0, 255)
+        if len(images.shape) < 4 and images.shape[-1] <= 4:
+            images = [images]
+        summary = []
+        for i, img in enumerate(images):
+            try:
+                from StringIO import StringIO
+                s = StringIO()
+            except:
+                from io import BytesIO
+                s = BytesIO()
+            from PIL import Image
+            Image.fromarray(img).save(s, format='png')
+            s = tf.Summary.Image(encoded_image_string=s.getvalue(), height=img.shape[0], width=img.shape[1])
+            summary.append(tf.Summary.Value(tag='{}{}'.format(tag, '/'+str(i) if len(images) > 1 else ''), image=s))
+        self.writer.add_summary(tf.Summary(value=summary), index)
+
 def train_tensor(dataset_or_iterator, losses, namespaces=None, optimizers=None, epochs=1, callback_epoch=None, callback_iter=None, show_var_list=True):
     iterator = dataset_or_iterator
     if isinstance(dataset_or_iterator, tf.data.Dataset):
@@ -529,7 +579,7 @@ def train_tensor(dataset_or_iterator, losses, namespaces=None, optimizers=None, 
         namespaces = [namespaces]
     assert len(losses) == len(namespaces), '# of losses and # of namespaces must be equal'
 
-    sess = Model.session()
+    sess = Session()
     sess.run(tf.global_variables_initializer())
 
     optimizers = [] if optimizers is None else optimizers
@@ -588,15 +638,16 @@ def train_tensor(dataset_or_iterator, losses, namespaces=None, optimizers=None, 
             t = time.time()
             if total is None:
                 if t - _tprog_ > 1 or cr:
-                    print('\rstep: {:,} - {}\r'.format(cur, msg), end='')
+                    cr = '\n\033[?7h' if cr else '\r'
+                    print('\033[?7l\rstep: {:,} - {}\033[K'.format(cur, msg), end=cr)
                     _tprog_ = t
             else:
-                left = min(int(cur * size / total), size)
                 if t - _tprog_ > 1 or cr:
                     if lmsg is None:
                         lmsg = '{:,}/{:,}'.format(cur, total)
-                    cr = '\n' if cr else '\r'
-                    print('\r{} [{}{}] {}\033[K'.format(lmsg, '#'*left, ' '*(size-left), msg), end=cr)
+                    left = min(int(cur * size / total), size)
+                    cr = '\n\033[?7h' if cr else '\r'
+                    print('\033[?7l\r{} [{}{}] {}\033[K'.format(lmsg, '#'*left, ' '*(size-left), msg), end=cr)
                     _tprog_ = t
     for epoch in range(epochs):
         tbeg = time.time()
@@ -638,8 +689,13 @@ def train_tensor(dataset_or_iterator, losses, namespaces=None, optimizers=None, 
         lmsg = ' ' * len(lmsg)
         print(lmsg, '- Iterations: {:,} ({:.1f} steps/s)'.format(size, float(size) / telapsed))
         print(lmsg, '- Total iterations: {:,}'.format(iter))
-        for namespace, loss in zip(namespaces, total_losses):
-            print(lmsg, '- Average loss{}: {}'.format(' for '+namespace if namespace else '', loss / size))
+        global _logger_
+        for i, (namespace, loss) in enumerate(zip(namespaces, total_losses)):
+            loss = loss / size
+            print(lmsg, '- Average loss{}: {}'.format(' for '+namespace if namespace else '', loss))
+            if _logger_:
+                namespace = 'loss/train'
+                _logger_.add_scalar('{}{}'.format(namespace, '/'+str(i) if len(total_losses) > 1 else ''), epoch, loss)
         if callback_epoch:
             if callback_epoch(epoch+1) == False:
                 print('[-] Training was aborted at epoch = {}'.format(epoch+1))
@@ -650,13 +706,15 @@ def save(name):
     global _saver_
     if _saver_ is None:
         _saver_ = tf.train.Saver(max_to_keep=None)
-    _saver_.save(Model.session(), name, write_meta_graph=False)
+    _saver_.save(Session(), name, write_meta_graph=False)
     print('[+] Model was saved:', name)
 
 def load(name):
     global _sess_, _saver_, _model_
+    if name.endswith('.index') or re.search('\.data-[0-9]+-of-[0-9]+$', name):
+        name = os.path.splitext(name)[0]
     _model_ = name
-    sess = Model.session()
+    sess = Session()
     try:
         if _saver_ is None:
             _saver_ = tf.train.Saver(max_to_keep=None)
@@ -669,7 +727,7 @@ def load(name):
     if os.path.isdir(name):
         name = tf.train.latest_checkpoint(name)
         if name is None:
-            print('[-] Cannot find the checkpoint in {}. Try to specify the filename of the model WITHOUT the extension.'.format(_model_))
+            print('[-] Cannot find the checkpoint in {}. Try to specify the filename of the model.'.format(_model_))
             exit(1)
     _saver_.restore(_sess_, name)
     print('[+] Model was successfully loaded:', name)
@@ -679,6 +737,13 @@ def set_random_seed(seed):
     global _random_seed_
     _random_seed_ = seed
     tf.set_random_seed(seed)
+
+def Session():
+    global _sess_
+    if _sess_ is None:
+        print('[+] Starting a session')
+        _sess_ = tf.Session()
+    return _sess_
 
 # colorize logs
 try:
@@ -703,6 +768,7 @@ _sess_ = None
 _nnnets_ = []
 _saver_ = None
 _model_ = None
+_logger_ = None
 _training_ = tf.placeholder(tf.bool, shape=())
 _feed_dict_ = {}
 _datasets_ = {}
