@@ -97,7 +97,7 @@ class Model(object):
         return node
 
     def addx(self, func, *args, **kwargs):
-        return add(func, self, *args, **kwargs)
+        return self.add(func, self, *args, **kwargs)
 
     def train(self, dataset, loss='mse', optimizer=None, epochs=1, validset=None, callback_epoch=None, callback_iter=None):
         dataset = Dataset(dataset)
@@ -474,8 +474,8 @@ def Variable(var, shape=None):
     """
     if type(var) == str:
         t = [v for v in tf.global_variables() if v.op.name == var]
-        if len(var) > 0:
-            return v[0]
+        if len(t) > 0:
+            return t[0]
         global _random_seed_
         if list(map(int, tf.__version__.split('.')))[0] == 1:
             initializer = tf.contrib.layers.variance_scaling_initializer('FAN_AVG', seed=_random_seed_)
@@ -486,7 +486,7 @@ def Variable(var, shape=None):
         return Model.session().run(var)
 
 def Parameter(param, new_value=None):
-    """ Parameter is non-trainable variable that the user can chane on the fly
+    """ Parameter is a non-trainable variable that the user can change on the fly
     To create a parameter foo:
     >>> foo = Parameter(1.0)
 
@@ -499,7 +499,7 @@ def Parameter(param, new_value=None):
     2.0
     """
     global _feed_dict_
-    if param is in _feed_dict_:
+    if param in _feed_dict_:
         if new_value:
             _feed_dict_.update({param: new_value})
         return _feed_dict_[param]

@@ -10,11 +10,11 @@ print('    Y = [{}, {}, ..., {}]'.format(Y[0], Y[1], Y[-1]))
 print('    hypothesis = a*x*x + b*x + c')
 
 x = Model()
-a, b, c = x.get_variable('a'), x.get_variable('b'), x.get_variable('c')
+a, b, c = Variable('a'), Variable('b'), Variable('c')
 y = a*x*x + b*x + c
 
 def print_values(epoch):
-    print('    (a, b, c) = ({}, {}, {})'.format(evaluate(a), evaluate(b), evaluate(c)))
+    print('    (a, b, c) = ({}, {}, {})'.format(Variable(a), Variable(b), Variable(c)))
     #save_model('model/model_{}'.format(epoch))
 
 y.train((X, Y), loss='mse', epochs=10, validset=(1, func(1)), callback_epoch=print_values)
