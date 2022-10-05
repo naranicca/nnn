@@ -43,11 +43,11 @@ class Model(object):
                     x = tf.placeholder(tf.float32, shape=shape)
                     self.testnet = self.__build_network(x, silent=True)
                     print('[+] The network for test was built successfully: input_shape =', shape)
-                ret = self.session().run(self.testnet, feed_dict=_feed_dict_)
+                ret = Session().run(self.testnet, feed_dict=_feed_dict_)
             except Exception as e:
                 x = tf.constant(input)
                 y = self.__build_network(x, silent=True)
-                ret = self.session().run(y, feed_dict=_feed_dict_)
+                ret = Session().run(y, feed_dict=_feed_dict_)
             _feed_dict_.update({_training_: t})
             return ret
 
@@ -60,7 +60,7 @@ class Model(object):
     @staticmethod
     def calc(func_or_tensor, *args, **kwargs):
         if isinstance(func_or_tensor, tf.Tensor):
-            return Grahp.session().run(func_or_tensor)
+            return Session().run(func_or_tensor)
         else:
             global _magiccode_
             return Model(name=_magiccode_).add(func_or_tensor, *args, **kwargs)
@@ -113,14 +113,14 @@ class Model(object):
             valid_output, valid_label = self.__call__(validset.input), validset.label
             valid_loss = Loss(loss, valid_output, valid_label)
             def validate(epoch):
-                self.session().run(validset.iterator.initializer)
+                Session().run(validset.iterator.initializer)
                 loss, cnt = 0, 0
                 global _feed_dict_
                 t = _feed_dict_.get(_training_)
                 _feed_dict_.update({_training_: False})
                 while True:
                     try:
-                        loss = loss + self.session().run(valid_loss, feed_dict=_feed_dict_)
+                        loss = loss + Session().run(valid_loss, feed_dict=_feed_dict_)
                         cnt = cnt + 1
                     except:
                         break
@@ -253,13 +253,6 @@ class Model(object):
         print((nf+' {:20} {:,}').format('output', '{}'.format(self.tensor.get_shape()), num_params))
         total_params = int(sum(np.prod(v.get_shape().as_list()) for v in tf.trainable_variables()))
         print('-'*mlen)
-
-    @staticmethod
-    def session():
-        global _sess_
-        if _sess_ is None:
-            _sess_ = tf.Session()
-        return _sess_
 
     # operator overloading
     def __add__(self, o):
@@ -483,7 +476,7 @@ def Variable(var, shape=None):
             initializer = tf.truncated_normal_initializer(stddev=0.1, seed=_random_seed_)
         return tf.get_variable(name=var, shape=shape if shape else (), initializer=initializer)
     else:
-        return Model.session().run(var)
+        return Session().run(var)
 
 def Parameter(param, new_value=None):
     """ Parameter is a non-trainable variable that the user can change on the fly
@@ -529,7 +522,7 @@ def train_tensor(dataset_or_iterator, losses, namespaces=None, optimizers=None, 
         namespaces = [namespaces]
     assert len(losses) == len(namespaces), '# of losses and # of namespaces must be equal'
 
-    sess = Model.session()
+    sess = Session()
     sess.run(tf.global_variables_initializer())
 
     optimizers = [] if optimizers is None else optimizers
@@ -650,13 +643,13 @@ def save(name):
     global _saver_
     if _saver_ is None:
         _saver_ = tf.train.Saver(max_to_keep=None)
-    _saver_.save(Model.session(), name, write_meta_graph=False)
+    _saver_.save(Session(), name, write_meta_graph=False)
     print('[+] Model was saved:', name)
 
 def load(name):
     global _sess_, _saver_, _model_
     _model_ = name
-    sess = Model.session()
+    sess = Session()
     try:
         if _saver_ is None:
             _saver_ = tf.train.Saver(max_to_keep=None)
@@ -679,6 +672,12 @@ def set_random_seed(seed):
     global _random_seed_
     _random_seed_ = seed
     tf.set_random_seed(seed)
+
+def Session():
+    global _sess_
+    if _sess_ is None:
+        _sess_ = tf.Session()
+    return _sess_
 
 # colorize logs
 try:
