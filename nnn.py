@@ -112,6 +112,9 @@ class Model(object):
         node.head = self.head
         return node
 
+    def addx(self, func, *args, **kwargs):
+        return add(func, self, *args, **kwargs)
+
     def train(self, dataset, loss='mse', optimizer=None, epochs=1, validset=None, callback_epoch=None, callback_iter=None):
         dataset = Dataset(dataset)
         output, labels = self.__call__(dataset.input), dataset.label
