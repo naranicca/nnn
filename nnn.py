@@ -9,9 +9,12 @@ try:
     tf.disable_v2_behavior()
 except:
     import tensorflow as tf
+import re
 import datetime, time
 import numpy as np
 import multiprocessing
+import pydoc
+pydoc.pager = pydoc.plainpager
 
 class Model(object):
     def __init__(self, name=None, input_shape=None):
@@ -465,7 +468,9 @@ def Variable(var, shape=None):
     To get the current value of a variable var:
     >>> Variable(var)
     """
-    if type(var) == str:
+    if isinstance(var, tf.Variable):
+        return Session().run(var)
+    elif type(var) == str:
         t = [v for v in tf.global_variables() if v.op.name == var]
         if len(t) > 0:
             return t[0]
@@ -476,7 +481,7 @@ def Variable(var, shape=None):
             initializer = tf.truncated_normal_initializer(stddev=0.1, seed=_random_seed_)
         return tf.get_variable(name=var, shape=shape if shape else (), initializer=initializer)
     else:
-        return Session().run(var)
+        return TypeError(Variable.__doc__)
 
 def Parameter(param, new_value=None):
     """ Parameter is a non-trainable variable that the user can change on the fly
@@ -648,6 +653,8 @@ def save(name):
 
 def load(name):
     global _sess_, _saver_, _model_
+    if name.endswith('.index') or re.search('\.data-[0-9]+-of-[0-9]+$', name):
+        name = os.path.splitext(name)[0]
     _model_ = name
     sess = Session()
     try:
@@ -662,7 +669,7 @@ def load(name):
     if os.path.isdir(name):
         name = tf.train.latest_checkpoint(name)
         if name is None:
-            print('[-] Cannot find the checkpoint in {}. Try to specify the filename of the model WITHOUT the extension.'.format(_model_))
+            print('[-] Cannot find the checkpoint in {}. Try to specify the filename of the model.'.format(_model_))
             exit(1)
     _saver_.restore(_sess_, name)
     print('[+] Model was successfully loaded:', name)
