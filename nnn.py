@@ -56,7 +56,7 @@ class Model(object):
 
     def __str__(self):
         if hasattr(self, 'summary'):
-            return '{}'.format(self.__show_summary())
+            return '{}'.format(self.show_summary())
         else:
             return self.__repr__()
 
@@ -107,7 +107,7 @@ class Model(object):
         output, labels = self.__call__(dataset.input), dataset.label
 
         print('[+] Summary of the network')
-        self.__show_summary()
+        self.show_summary()
 
         train_loss = Loss(loss, output, labels)
 
@@ -198,7 +198,7 @@ class Model(object):
                                 node.tensor = func(*args, **kwargs)
                             except Exception as e:
                                 if not silent:
-                                    self.__show_summary(footer=False)
+                                    self.show_summary(footer=False)
                                     print(node.__name)
                                     print(str(e))
                                 raise
@@ -237,7 +237,7 @@ class Model(object):
             load(_model_)
         return ret
 
-    def __show_summary(self, footer=True):
+    def show_summary(self, footer=True):
         nlen, plen = 0, 0
         for s in self.summary:
             nlen, plen = max(len(s['name'])+1, nlen), max(len(s['param'])+1, plen)
