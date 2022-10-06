@@ -481,7 +481,7 @@ def Variable(var, shape=None):
             initializer = tf.truncated_normal_initializer(stddev=0.1, seed=_random_seed_)
         return tf.get_variable(name=var, shape=shape if shape else (), initializer=initializer)
     else:
-        return TypeError(Variable.__doc__)
+        raise TypeError(Variable.__doc__)
 
 def Parameter(param, new_value=None):
     """ Parameter is a non-trainable variable that the user can change on the fly
