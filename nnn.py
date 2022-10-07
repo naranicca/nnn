@@ -586,15 +586,16 @@ def train_tensor(dataset_or_iterator, losses, namespaces=None, optimizers=None, 
             t = time.time()
             if total is None:
                 if t - _tprog_ > 1 or cr:
-                    print('\rstep: {:,} - {}\r'.format(cur, msg), end='')
+                    cr = '\n\033[?7h' if cr else '\r'
+                    print('\033[?7l\rstep: {:,} - {}\033[K'.format(cur, msg), end=cr)
                     _tprog_ = t
             else:
-                left = min(int(cur * size / total), size)
                 if t - _tprog_ > 1 or cr:
                     if lmsg is None:
                         lmsg = '{:,}/{:,}'.format(cur, total)
-                    cr = '\n' if cr else '\r'
-                    print('\r{} [{}{}] {}\033[K'.format(lmsg, '#'*left, ' '*(size-left), msg), end=cr)
+                    left = min(int(cur * size / total), size)
+                    cr = '\n\033[?7h' if cr else '\r'
+                    print('\033[?7l\r{} [{}{}] {}\033[K'.format(lmsg, '#'*left, ' '*(size-left), msg), end=cr)
                     _tprog_ = t
     for epoch in range(epochs):
         tbeg = time.time()
