@@ -468,7 +468,9 @@ def Variable(var, shape=None):
     To get the current value of a variable var:
     >>> Variable(var)
     """
-    if isinstance(var, tf.Variable):
+    if var is None:
+        return tf.trainable_variables()
+    elif isinstance(var, tf.Variable):
         return Session().run(var)
     elif type(var) == str:
         t = [v for v in tf.global_variables() if v.op.name == var]
@@ -506,6 +508,30 @@ def Parameter(param, new_value=None):
         p = tf.placeholder(tf.float32, shape=np.array(param).shape)
         _feed_dict_.update({p: param})
         return p
+
+class Logger(object):
+    def __init__(self, dir):
+        global _logger_
+        _logger_ = self
+        self.writer = tf.summary.FileWriter(dir)
+        print('[+] Tensorboard data will be saved:', dir)
+    def add_scalar(self, tag, index, value):
+        s = tf.Summary(value=[tf.Summary.Value(tag=tag, simple_value=value)])
+        self.writer.add_summary(s, index)
+    def add_histogram(self, tag, index, values bins=1000):
+        cnt, bins = np.histogram(values, bins=bins)
+        hist = tf.HistogramProto()
+        hist.min = float(np.min(values))
+        hist.max = float(np.max(values))
+        hist.num = int(np.prod(values.shape))
+        hist.sum = float(np.sum(values))
+        hist.sum_squares = float(np.sum(values**2))
+        for edge in bins[1:]:
+            hist.bucket_limit.append(edge)
+        for c in cnt:
+            hist.bucket.append(c)
+        s = tf.Summary(value=[tf.Summary.Value(tag=tag, histo=hist)])
+        self.writer.add_summary(s, index)
 
 def train_tensor(dataset_or_iterator, losses, namespaces=None, optimizers=None, epochs=1, callback_epoch=None, callback_iter=None, show_var_list=True):
     iterator = dataset_or_iterator
@@ -637,8 +663,13 @@ def train_tensor(dataset_or_iterator, losses, namespaces=None, optimizers=None, 
         lmsg = ' ' * len(lmsg)
         print(lmsg, '- Iterations: {:,} ({:.1f} steps/s)'.format(size, float(size) / telapsed))
         print(lmsg, '- Total iterations: {:,}'.format(iter))
-        for namespace, loss in zip(namespaces, total_losses):
-            print(lmsg, '- Average loss{}: {}'.format(' for '+namespace if namespace else '', loss / size))
+        global _logger_
+        for i, (namespace, loss) in enumerate(zip(namespaces, total_losses)):
+            loss = loss / size
+            print(lmsg, '- Average loss{}: {}'.format(' for '+namespace if namespace else '', loss))
+            if _logger_:
+                namespace = 'loss/train'
+                _logger_.add_scalar('{}{}'.format(namespace, '/'+str(i) if len(total_losses) > 1 else ''), epoch, loss)
         if callback_epoch:
             if callback_epoch(epoch+1) == False:
                 print('[-] Training was aborted at epoch = {}'.format(epoch+1))
@@ -710,6 +741,7 @@ _sess_ = None
 _nnnets_ = []
 _saver_ = None
 _model_ = None
+_logger_ = None
 _training_ = tf.placeholder(tf.bool, shape=())
 _feed_dict_ = {}
 _datasets_ = {}
