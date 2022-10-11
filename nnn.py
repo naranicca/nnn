@@ -467,6 +467,9 @@ def Variable(var, shape=None):
 
     To get the current value of a variable var:
     >>> Variable(var)
+
+    All trainable variables are retrieve if var is None
+    >>> all_var = Variable(None)
     """
     if var is None:
         return tf.trainable_variables()
@@ -518,7 +521,7 @@ class Logger(object):
     def add_scalar(self, tag, index, value):
         s = tf.Summary(value=[tf.Summary.Value(tag=tag, simple_value=value)])
         self.writer.add_summary(s, index)
-    def add_histogram(self, tag, index, values bins=1000):
+    def add_histogram(self, tag, index, values, bins=1000):
         cnt, bins = np.histogram(values, bins=bins)
         hist = tf.HistogramProto()
         hist.min = float(np.min(values))
