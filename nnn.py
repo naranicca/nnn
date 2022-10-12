@@ -310,8 +310,8 @@ class Model(object):
     def concat(self, x, axis=-1):
         return self.add(tf.concat, [self, x], axis=axis)
 
-    def slice(self, start, stop):
-        def slice(x, start, stop):
+    def slice(self, start, stop=None):
+        def slice(x, start, stop if stop else start+1):
             return x[..., start:stop]
         return self.add(slice, self, start, stop)
 
@@ -535,6 +535,28 @@ class Logger(object):
             hist.bucket.append(c)
         s = tf.Summary(value=[tf.Summary.Value(tag=tag, histo=hist)])
         self.writer.add_summary(s, index)
+    def add_image(self, tag, index, images):
+        min, max = np.min(images), np.max(images)
+        if min >= 0 and max <= 1:
+            images = images *255
+        elif min >= -1 and max <= 1:
+            images = (images + 1) * 127.5
+        images = np.clip(np.round(images).astype(np.uint8), 0, 255)
+        if len(images.shape) < 4 and images.shape[-1] <= 4:
+            images = [images]
+        summary = []
+        for i, img in enumerate(images):
+            try:
+                from StringIO import StringIO
+                s = StringIO()
+            except:
+                from io import BytesIO
+                s = BytesIO()
+            from PIL import Image
+            Image.fromarray(img).save(s, format='png')
+            s = tf.Summary.Image(encoded_image_string=s.getvalue(), height=img.shape[0], width=img.shape[1])
+            summary.append(tf.Summary.Value(tag='{}{}'.format(tag, '/'+str(i) if len(images) > 1 else ''), image=s))
+        self.writer.add_summary(tf.Summary(value=summary), index)
 
 def train_tensor(dataset_or_iterator, losses, namespaces=None, optimizers=None, epochs=1, callback_epoch=None, callback_iter=None, show_var_list=True):
     iterator = dataset_or_iterator
@@ -718,6 +740,7 @@ def set_random_seed(seed):
 def Session():
     global _sess_
     if _sess_ is None:
+        print('[+] Starting a session')
         _sess_ = tf.Session()
     return _sess_
 
