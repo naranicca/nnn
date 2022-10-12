@@ -311,9 +311,9 @@ class Model(object):
         return self.add(tf.concat, [self, x], axis=axis)
 
     def slice(self, start, stop=None):
-        def slice(x, start, stop if stop else start+1):
+        def slice(x, start, stop):
             return x[..., start:stop]
-        return self.add(slice, self, start, stop)
+        return self.add(slice, self, start, stop if stop else start+1)
 
     def flatten(self):
         return self.add(tf.layers.flatten, self)
@@ -538,7 +538,7 @@ class Logger(object):
     def add_image(self, tag, index, images):
         min, max = np.min(images), np.max(images)
         if min >= 0 and max <= 1:
-            images = images *255
+            images = images * 255
         elif min >= -1 and max <= 1:
             images = (images + 1) * 127.5
         images = np.clip(np.round(images).astype(np.uint8), 0, 255)
