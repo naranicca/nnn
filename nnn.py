@@ -535,7 +535,8 @@ class Logger(object):
             hist.bucket.append(c)
         s = tf.Summary(value=[tf.Summary.Value(tag=tag, histo=hist)])
         self.writer.add_summary(s, index)
-    def add_image(self, tag, index, images):
+    def add_image(self, tag, index, rgb_images):
+        images = rgb_images
         min, max = np.min(images), np.max(images)
         if min >= 0 and max <= 1:
             images = images * 255
