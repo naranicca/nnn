@@ -25,9 +25,9 @@ class Model(object):
         self.idx = 0
         if input_shape is not None:
             self.input_shape = [None] + list(input_shape)
-        global _nnnets_
-        if not self in _nnnets_:
-            _nnnets_.append(self)
+        global _nodes_
+        if not self in _nodes_:
+            _nodes_.append(self)
 
     def __call__(self, input):
         if tf.is_tensor(input):
@@ -69,8 +69,8 @@ class Model(object):
             return Model(name=_magiccode_).add(func_or_tensor, *args, **kwargs)
 
     def name(self, name):
-        global _nnnets_
-        for n in _nnnets_:
+        global _nodes_
+        for n in _nodes_:
             if n.__name == name:
                 raise AssertionError('name {} already exists'.format(name))
         self.__name = name
@@ -152,7 +152,7 @@ class Model(object):
     #    self.head.__weights.append(filename)
 
     def __build_network(self, input, silent=False):
-        global _magiccode_, _nnnets_, _model_, _random_seed_
+        global _magiccode_, _nodes_, _model_, _random_seed_
         if _random_seed_ is not None:
             tf.set_random_seed(_random_seed_)
             np.random.seed(_random_seed_)
@@ -229,7 +229,7 @@ class Model(object):
         if _random_seed_ is not None and self.tensor is None:
             print('[+] Network is built with random seed =', _random_seed_)
         # clear Model objects
-        for n in _nnnets_:
+        for n in _nodes_:
             n.tensor = None
         self.summary = summary
         ret = compile_node(self, input)
@@ -765,7 +765,7 @@ def print(*args, **kwargs):
 ###############################################################################
 # global variables
 _sess_ = None
-_nnnets_ = []
+_nodes_ = []
 _saver_ = None
 _model_ = None
 _logger_ = None
