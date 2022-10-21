@@ -512,6 +512,9 @@ def Parameter(param, new_value=None):
         _feed_dict_.update({p: param})
         return p
 
+def Evalueate(v, feed_dict=None):
+    return Session().run(v, feed_dict=feed_dict)
+
 class Logger(object):
     def __init__(self, dir):
         global _logger_
