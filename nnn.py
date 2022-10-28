@@ -103,6 +103,9 @@ class Model(object):
         return self.add(func, self, *args, **kwargs)
 
     def train(self, dataset, loss='mse', optimizer=None, epochs=1, validset=None, callback_epoch=None, callback_iter=None):
+        global _random_seed_
+        if _random_seed_ is None:
+            set_random_seed()
         dataset = Dataset(dataset)
         output, labels = self.__call__(dataset.input), dataset.label
 
@@ -153,9 +156,8 @@ class Model(object):
 
     def __build_network(self, input, silent=False):
         global _magiccode_, _nodes_, _model_, _random_seed_
-        if _random_seed_ is not None:
-            tf.set_random_seed(_random_seed_)
-            np.random.seed(_random_seed_)
+        if _random_seed_ is None:
+            set_random_seed()
         summary = []
         def compile_node(node, input):
             if node.tensor is None:
@@ -226,8 +228,6 @@ class Model(object):
                     name = ' ' if node.__name is None else node.__name.split('/')[-1] if node.__name.startswith(_magiccode_) else node.__name
                     summary.append({'name': name, 'shape': '{}'.format(node.tensor.get_shape()), 'num_param': num_param, 'param': param})
             return node.tensor
-        if _random_seed_ is not None and self.tensor is None:
-            print('[+] Network is built with random seed =', _random_seed_)
         # clear Model objects
         for n in _nodes_:
             n.tensor = None
@@ -736,10 +736,18 @@ def load(name):
     print('[+] Model was successfully loaded:', name)
     _model_ = None
 
-def set_random_seed(seed):
+def set_random_seed(seed=None):
+    if seed is None:
+        seed = int(round(time.time() * 1000)) & 0xFFFFFFFF
     global _random_seed_
+    if _random_seed_ is not None:
+        if _random_seed_ == seed:
+            return
+        print('[-] random seed was already set to', _random_seed_)
     _random_seed_ = seed
     tf.set_random_seed(seed)
+    np.random.seed(seed)
+    print('[+] random_seed =', seed)
 
 def Session():
     global _sess_
