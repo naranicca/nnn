@@ -162,8 +162,12 @@ class Model(object):
         def compile_node(node, input):
             if node.tensor is None:
                 if node.func:
+                    node.variables = []
                     func, args, kwargs = node.func[0], list(node.func[1]), node.func[2]
                     for i, arg in enumerate(args):
+                        if isinstance(arg, tf.Tensor) or isinstance(arg, tf.Variable):
+                            if not arg in node.variables:
+                                node.variables.append(arg)
                         if isinstance(arg, node.__class__):
                             args[i] = compile_node(arg, input)
                         elif type(arg) == tuple or type(arg) == list:
@@ -175,6 +179,9 @@ class Model(object):
                                     l.append(a)
                             args[i] = l
                     for kwarg in kwargs:
+                        if isinstance(kwargs[kwarg], tf.Tensor) or isinstance(kwargs[kwarg], tf.Variable):
+                            if not kwargs[kwarg] in node.variables:
+                                node.variables.append(kwargs[kwarg])
                         if isinstance(kwargs[kwarg], node.__class__):
                             kwargs[kwarg] = compile_node(kwargs[kwarg], input)
                         elif kwarg == 'activation':
@@ -214,6 +221,9 @@ class Model(object):
                             except TypeError:
                                 pass
                     param = [v for v in tf.trainable_variables() if node.__name and v.name.startswith(node.__name)]
+                    for v in node.variables:
+                        if not v in param:
+                            param.append(v)
                 else:
                     node.tensor = tf.cast(input, tf.float32)
                     param = []
@@ -253,8 +263,9 @@ class Model(object):
         if not footer:
             return
         print('='*mlen)
-        print((nf+' {:20} {:,}').format('output', '{}'.format(self.tensor.get_shape()), num_params))
+        print((nf+' {:20} {:,}').format('Output', '{}'.format(self.tensor.get_shape()), num_params))
         total_params = int(sum(np.prod(v.get_shape().as_list()) for v in tf.trainable_variables()))
+        print((nf+' {:20} {:,}').format('Total', '{}'.format(''), num_params))
         print('-'*mlen)
 
     # operator overloading
@@ -487,6 +498,9 @@ def Variable(var, shape=None):
         return tf.get_variable(name=var, shape=shape if shape else (), initializer=initializer)
     else:
         raise TypeError(Variable.__doc__)
+
+def traiable_variables():
+    return tf.trainable_variables()
 
 def Parameter(param, new_value=None):
     """ Parameter is a non-trainable variable that the user can change on the fly
