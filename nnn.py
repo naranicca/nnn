@@ -106,7 +106,7 @@ class Model(object):
         global _random_seed_
         if _random_seed_ is None:
             set_random_seed()
-        dataset = Dataset(dataset)
+        dataset = Dataset(dataset, name='Trainset')
         output, labels = self.__call__(dataset.input), dataset.label
 
         print('[+] Summary of the network')
@@ -115,7 +115,7 @@ class Model(object):
         train_loss = Loss(loss, output, labels)
 
         if validset:
-            validset = Dataset(validset, shuffle=False)
+            validset = Dataset(validset, shuffle=False, name='Validset')
             valid_output, valid_label = self.__call__(validset.input), validset.label
             valid_loss = Loss(loss, valid_output, valid_label)
             def validate(epoch):
@@ -350,8 +350,9 @@ class Model(object):
         return self.add(tf.nn.depth_to_space, self, size)
 
 class Dataset():
-    def __init__(self, data, shuffle=True, preprocess=None):
+    def __init__(self, data, shuffle=True, preprocess=None, name='Dataset'):
         self.size = None
+        self.name = name
         global _datasets_
         try:
             if issubclass(data.__class__, Dataset):
@@ -390,7 +391,7 @@ class Dataset():
         if shuffle:
             dataset = dataset.shuffle(len(inputs))
         if preprocess:
-            print('[+] Creating dataset')
+            print('[+] Creating', self.name)
             for proc in preprocess if type(preprocess) == tuple or type(preprocess) == list else [preprocess]:
                 if proc == 'unbatch':
                     dataset = dataset.unbatch()
@@ -411,7 +412,7 @@ class Dataset():
         if preprocess:
             print('batch/reshape:', dataset)
         dataset = dataset.prefetch(batch_size)
-        print('[+] Dataset was built: size={}, batch_size={}, shuffle={}'.format(len(inputs), batch_size, shuffle))
+        print('[+] {} was built: size={}, batch_size={}, shuffle={}'.format(self.name, len(inputs), batch_size, shuffle))
         dataset.size = len(inputs)
         return dataset
 
