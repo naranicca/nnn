@@ -15,7 +15,6 @@ y = a*x*x + b*x + c
 
 def print_values(epoch):
     print('    (a, b, c) = ({}, {}, {})'.format(Variable(a), Variable(b), Variable(c)))
-    #save_model('model/model_{}'.format(epoch))
 
 y.train((X, Y), loss='mse', epochs=10, validset=(1, func(1)), callback_epoch=print_values)
 

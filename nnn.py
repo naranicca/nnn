@@ -752,8 +752,12 @@ def load(name):
     if os.path.isdir(name):
         name = tf.train.latest_checkpoint(name)
         if name is None:
-            print('[-] Cannot find the checkpoint in {}. Try to specify the filename of the model.'.format(_model_))
-            exit(1)
+            from glob import glob
+            name = sorted(glob(os.path.join(_model_, '*.index')), key=os.path.getctime)
+            if len(name) == 0:
+                print('[-] Cannot find the checkpoint in {}.'.format(_model_))
+                exit(1)
+            name = name[-1]
     _saver_.restore(_sess_, name)
     print('[+] Model was successfully loaded:', name)
     _model_ = None
