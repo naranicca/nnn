@@ -377,6 +377,13 @@ class Dataset():
         elif type(data) == dict:
             inputs, labels = data['input'], data['label']
             batch_size = data['batch_size'] if 'batch_size' in data else 1
+        elif isinstance(data, np.ndarray):
+            if len(data.shape) != 2:
+                print('[-] Data shape must be one of (2, N) and (N, 2)')
+                exit(1)
+            if data.shape[0] != 2 and data.shape[1] == 2:
+                data = data.reshape((2, -1))
+            inputs, labels, batch_size = data[0], data[1], 1
         else:
             raise AssertionError('Unknown type of dataset')
         if type(inputs) == int or type(inputs) == float:
