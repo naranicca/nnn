@@ -17,14 +17,12 @@ import pydoc
 pydoc.pager = pydoc.plainpager
 
 class Model(object):
-    def __init__(self, name=None, input_shape=None):
+    def __init__(self, name=None):
         self.__name = name
         self.func = []
         self.tensor = None
         self.head = self
         self.idx = 0
-        if input_shape is not None:
-            self.input_shape = [None] + list(input_shape)
         global _nodes_
         if not self in _nodes_:
             _nodes_.append(self)
@@ -37,20 +35,29 @@ class Model(object):
             global _feed_dict_
             t = _feed_dict_.get(_training_)
             _feed_dict_.update({_training_: False})
-            try:
-                if not 'testnet' in self.__dict__:
-                    if 'input_shape' in self.head.__dict__:
-                        shape = self.head.input_shape
-                    else:
-                        shape = [None] * len(np.array(input).shape)
+            if not 'testnet' in self.__dict__:
+                self.testnet = {}
+            found = False
+            for x in self.testnet:
+                try:
+                    y = self.testnet[x]
+                    ret = Session().run(y, feed_dict={**_feed_dict_, x: input})
+                    found = True
+                    break
+                except:
+                    pass
+            if not found:
+                try:
+                    shape = [None] * len(np.array(input).shape)
                     x = tf.placeholder(tf.float32, shape=shape)
-                    self.testnet = self.__build_network(x, silent=True)
-                    print('[+] The network for test was built successfully: input_shape =', shape)
+                    y = self.__build_network(x, silent=True)
+                except:
+                    shape = np.array(input).shape
+                    x = tf.placeholder(tf.float32, shape=shape)
+                    y = self.__build_network(x, silent=True)
+                print('[+] The network was built with input shape of', shape)
+                self.testnet.update({x: y})
                 ret = Session().run(self.testnet, feed_dict=_feed_dict_)
-            except Exception as e:
-                x = tf.constant(input)
-                y = self.__build_network(x, silent=True)
-                ret = Session().run(y, feed_dict=_feed_dict_)
             _feed_dict_.update({_training_: t})
             return ret
 
