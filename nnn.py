@@ -57,7 +57,7 @@ class Model(object):
                     y = self.__build_network(x, silent=True)
                 print('[+] The network was built with input shape of', shape)
                 self.testnet.update({x: y})
-                ret = Session().run(self.testnet, feed_dict=_feed_dict_)
+                ret = Session().run(y, feed_dict={**_feed_dict_, x:input})
             _feed_dict_.update({_training_: t})
             return ret
 
