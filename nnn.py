@@ -444,7 +444,6 @@ def Loss(loss, pred, label):
     elif loss == 'binary_crossentropy':
         eps = 1e-7
         pred = tf.clip_by_value(pred, eps, 1 - eps)
-        pred = tf.log(pred / (1 - pred))
         if not tf.is_tensor(label):
             label = tf.constant(label, tf.float32)
         if len(label.get_shape().as_list()) == 0:
