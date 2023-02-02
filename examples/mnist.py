@@ -7,7 +7,7 @@ from tensorflow import keras
 x_train = x_train / 255.
 x_test = x_test / 255.
 
-mnist = Model(input_shape=(28, 28))
+mnist = Model()
 mnist = mnist.add(tf.expand_dims, mnist, axis=-1)
 mnist = mnist.conv2d(5, 32)
 mnist = mnist.max_pool(2)
