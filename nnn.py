@@ -696,7 +696,10 @@ def train_tensor(dataset_or_iterator, losses, namespaces=None, optimizers=None, 
                 try:
                     ll = []
                     for op, l in zip(optimizers, losses):
-                        _, loss = sess.run([op, l], feed_dict=_feed_dict_)
+                        if callback_iter:
+                            _, loss, x, y = sess.run([op, l, dataset.input, dataset.label], feed_dict=_feed_dict_)
+                        else:
+                            _, loss = sess.run([op, l], feed_dict=_feed_dict_)
                         ll.append(loss)
                     if len(ll) == len(losses):
                         loss_list = 'loss: {}'.format(ll[0] if len(ll) == 1 else tuple(ll))
@@ -707,7 +710,7 @@ def train_tensor(dataset_or_iterator, losses, namespaces=None, optimizers=None, 
                 iter = iter + 1
                 total_losses[loss_idx] = total_losses[loss_idx] + loss
                 if callback_iter:
-                    if callback_iter(iter) == False:
+                    if callback_iter(iter, input=x, label=y) == False:
                         show_progress(i, size, msg='{:.1f}s, {}'.format(time.time() - tbeg, loss_list), lmsg=lmsg, cr=True)
                         print('[-] Training was aborted at iteration = {}'.format(iter))
                         return
