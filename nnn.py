@@ -360,6 +360,7 @@ class Dataset():
     def __init__(self, data, shuffle=True, preprocess=None, name='Dataset'):
         self.size = None
         self.name = name
+        self.batch_size = 1
         global _datasets_
         try:
             if issubclass(data.__class__, Dataset):
@@ -662,10 +663,10 @@ def train_tensor(dataset_or_iterator, losses, namespaces=None, optimizers=None, 
         print('-' * tlen)
 
     print('[+] Training started at', datetime.datetime.now())
-    size = dataset.size
+    size = (dataset.size // dataset.batch_size) if dataset.size else None
     iter = 0
-    def show_progress(cur, total, msg, size=15, lmsg=None, cr=False):
-        global _tprog_
+    def show_progress(cur, total, msg, size=40, lmsg=None, cr=False, color=32):
+        global _tprog_, _lprog_
         if os.fstat(0) == os.fstat(1) or cr:
             t = time.time()
             if total is None:
@@ -678,9 +679,13 @@ def train_tensor(dataset_or_iterator, losses, namespaces=None, optimizers=None, 
                     if lmsg is None:
                         lmsg = '{:,}/{:,}'.format(cur, total)
                     left = min(int(cur * size / total), size)
-                    cr = '\n\033[?7h' if cr else '\r'
-                    print('\033[?7l\r{} [{}{}] {}\033[K'.format(lmsg, '#'*left, ' '*(size-left), msg), end=cr)
+                    cr = '\n\033[?7h' if cr else ''
+                    blk = b'\xe2\x94\x81'.decode('utf-8')
+                    print('\b' * _lprog_, end='')
+                    str = '\r{} \033[{}m{}\033[90m{}\033[0m {}\033[K'.format(lmsg, color, blk*left, blk*(size-left), msg)
+                    print(str, end=cr)
                     _tprog_ = t
+                    _lprog_ = len(str)
     for epoch in range(epochs):
         tbeg = time.time()
         i, loss_list = 0, []
@@ -705,13 +710,13 @@ def train_tensor(dataset_or_iterator, losses, namespaces=None, optimizers=None, 
                         loss_list = 'loss: {}'.format(ll[0] if len(ll) == 1 else tuple(ll))
                 except ee:
                     break
-                show_progress(i+1, size, '{:.1f}s, {}'.format(time.time() - tbeg, loss_list), lmsg=lmsg)
+                show_progress(i+1, size, '{:.1f}s, {}'.format(time.time() - tbeg, loss_list), lmsg=lmsg, color=94)
                 i = i + 1
                 iter = iter + 1
                 total_losses[loss_idx] = total_losses[loss_idx] + loss
                 if callback_iter:
                     if callback_iter(iter, input=x, label=y) == False:
-                        show_progress(i, size, msg='{:.1f}s, {}'.format(time.time() - tbeg, loss_list), lmsg=lmsg, cr=True)
+                        show_progress(i, size, msg='{:.1f}s, {}'.format(time.time() - tbeg, loss_list), lmsg=lmsg, cr=True, color=32)
                         print('[-] Training was aborted at iteration = {}'.format(iter))
                         return
                 ee = (tf.errors.OutOfRangeError, tf.errors.InvalidArgumentError)
@@ -820,6 +825,7 @@ _training_ = tf.placeholder(tf.bool, shape=())
 _feed_dict_ = {}
 _datasets_ = {}
 _tprog_ = 0
+_lprog_ = 0
 _random_seed_ = None
 _isiterable_ = lambda v: (type(v) == list or type(v) == tuple)
 _magiccode_ = 'qliuhgalkjsdfakudhgvlajbnesiuhd'
