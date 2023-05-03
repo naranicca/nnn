@@ -227,7 +227,7 @@ class Model(object):
                                 node.tensor = tf.cond(_training_, lambda: tensor_training, lambda: tensor_inference)
                             except TypeError:
                                 pass
-                    param = [v for v in tf.trainable_variables() if node.__name and v.name.startswith(node.__name)]
+                    param = [v for v in tf.trainable_variables() if node.__name and v.name.startswith(node.__name + '/')]
                     for v in node.variables:
                         if not v in param:
                             param.append(v)
