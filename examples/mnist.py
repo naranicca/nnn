@@ -30,4 +30,15 @@ print('[+] evaluating')
 output = np.argmax(mnist(x_test), axis=-1)
 print('accuracy:', np.mean(np.equal(output, y_test).astype(np.float32)))
 
+print('[+] saving the model')
+mnist.save('model')
+print(mnist.get_weights())
+
+print('[+] quantization')
+mnist.save('quantized_model.tflite', quantization='float16')
+
+print('[+] load quantized model')
+mnist.load('quantized_model.tflite')
+print(mnist.get_weights())
+
 

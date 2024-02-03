@@ -154,24 +154,37 @@ class Model(object):
         if not hasattr(self, 'model') or self.model is None:
             self.model = tf.keras.Model(inputs=self.input, outputs=self.tensor)
 
-def SetLogger(filename=None):
+def set_logger(filename=None):
     class Logger(object):
         def __init__(self, filename):
-            self.old_stdout = sys.stdout if not isinstance(sys.stdout, Logger) else sys.stdout.old_stdout
-            self.log = open(filename) if filename else None
-        def write(self, msg):
-            if self.log:
-                self.log.write(msg)
-            if msg.startswith('[+]'):
-                msg = '\033[36m' + msg + '\033[0m'
-            elif msg.startswith('[-]'):
-                msg = '\033[31m' + msg + '\033[0m'
-            self.old_stdout.write(msg)
+            self.str = ''
+            self.stdout = sys.stdout if not isinstance(sys.stdout, Logger) else sys.stdout
+            self.file = open(filename, 'w') if filename else None
+        def write(self, str):
+            if str == '\n':
+                if self.str:
+                    return
+                str += '\033[0m'
+            if str.startswith('\r'):
+                sys.stderr.write('\b' * len(self.str) + str + '\033[0m\033[K')
+                sys.stderr.flush()
+                self.str = str
+                return
+            #if self.str:
+            #    sys.stderr.write('\n')
+            if self.file:
+                self.file.write(str + '\n')
+                self.file.flush()
+            if str.startswith('[+]'):
+                str = '\033[36m' + str
+            elif str.startswith('[-]'):
+                str = '\033[31m' + str
+            self.stdout.write(str)
+            self.str = ''
         def flush(self):
-            if self.log:
-                self.log.flush()
-            self.old_stdout.flush()
+            #self.write('')
+            self.stdout.flush()
     sys.stdout = Logger(filename)
-SetLogger(None)
+set_logger(None)
 
 
