@@ -63,7 +63,11 @@ class Model(object):
         assert self.tensor is not None, 'Model is empty!'
         self.__build()
         self.model.compile(loss=loss, optimizer=optimizer)
+        # disable my logger since it doesn't compatible with fit's output
+        logger = sys.stdout
+        sys.stdout = sys.stdout.stdout
         self.model.fit(x, y, epochs=epochs, batch_size=batch_size, validation_data=validation_data)
+        sys.stdout = logger
 
     def get_weights(self):
         if hasattr(self, 'weights'):
@@ -158,7 +162,7 @@ def set_logger(filename=None):
     class Logger(object):
         def __init__(self, filename):
             self.str = ''
-            self.stdout = sys.stdout if not isinstance(sys.stdout, Logger) else sys.stdout
+            self.stdout = sys.stdout if not isinstance(sys.stdout, Logger) else sys.stdout.stdout
             self.file = open(filename, 'w') if filename else None
         def write(self, str):
             if str == '\n':
@@ -170,8 +174,8 @@ def set_logger(filename=None):
                 sys.stderr.flush()
                 self.str = str
                 return
-            #if self.str:
-            #    sys.stderr.write('\n')
+            if self.str:
+                sys.stderr.write('\n')
             if self.file:
                 self.file.write(str + '\n')
                 self.file.flush()
