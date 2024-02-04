@@ -1,7 +1,7 @@
 import sys
 import tensorflow as tf
 import numpy as np
-from tensorflow.keras.layers import Input, Reshape, Conv2D, MaxPooling2D, Dense, Flatten, Dropout, Activation
+from tensorflow.keras.layers import Input, Reshape, Conv2D, Conv2DTranspose, MaxPooling2D, GlobalMaxPooling2D, Dense, Flatten, Dropout, Activation, LeakyReLU
 
 class Model(object):
     def __init__(self, input_shape=None, model_path=None):
@@ -33,8 +33,14 @@ class Model(object):
     def conv2d(self, out_channels, kernel, **kwargs):
         return self.add(Conv2D(out_channels, kernel, **kwargs))
 
+    def deconv2d(self, out_channels, kernel, **kwargs):
+        return self.add(Conv2DTranspose(out_channels, kernel, **kwargs))
+
     def maxpool(self, pool_size, strides=None, padding='valid', **kwargs):
         return self.add(MaxPooling2D(pool_size, strides=strides, padding=padding, **kwargs))
+
+    def global_maxpool(self, **kwargs):
+        return self.add(GlobalMaxPooling2D(**kwargs))
 
     def dense(self, units, **kwargs):
         return self.add(Dense(units, **kwargs))
@@ -47,6 +53,9 @@ class Model(object):
 
     def activation(self, activation, **kwargs):
         return self.add(Activation(activation, **kwargs))
+
+    def leaky_relu(self, alpha=0.2):
+        return self.add(LeakyReLU(alpha=alpha))
 
     def add(self, func, **kwargs):
         assert self.tensor is not None, 'Model is empty!'
