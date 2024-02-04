@@ -19,7 +19,7 @@ class Model(object):
         assert self.model is not None, 'Model is not built yet'
         self.__used = True
         if isinstance(self.model, tf.keras.Model):
-            return self.model.predict(input, verbose=0)
+            return self.model(input, training=False)
         else:
             input_index = self.model.get_input_details()[0]['index']
             output_index = self.model.get_output_details()[0]['index']
