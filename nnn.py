@@ -63,6 +63,7 @@ class Model(object):
         assert self.tensor is not None, 'Model is empty!'
         self.__build()
         self.model.compile(loss=loss, optimizer=optimizer)
+
         # disable my logger since it doesn't compatible with fit's output
         logger = sys.stdout
         sys.stdout = sys.stdout.stdout
@@ -156,7 +157,17 @@ class Model(object):
 
     def __build(self):
         if not hasattr(self, 'model') or self.model is None:
-            self.model = tf.keras.Model(inputs=self.input, outputs=self.tensor)
+            class nnnModel(tf.keras.Model):
+                def train_step(self, data):
+                    x, y = data # unpack
+                    with tf.GradientTape() as tape:
+                        y_pred = self(x, training=True)
+                        loss = self.compiled_loss(y, y_pred, regularization_losses=self.losses)
+                    gradients = tape.gradient(loss, self.trainable_variables)
+                    self.optimizer.apply_gradients(zip(gradients, self.trainable_variables))
+                    self.compiled_metrics.update_state(y, y_pred)
+                    return {m.name: m.result() for m in self.metrics}
+            self.model = nnnModel(inputs=self.input, outputs=self.tensor)
 
 def set_logger(filename=None):
     class Logger(object):
