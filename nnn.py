@@ -16,7 +16,7 @@ class Model(object):
             self.load(model_path)
 
     def __call__(self, input):
-        assert self.model is not None, 'Model is not built yet'
+        self.__build()
         self.__used = True
         if isinstance(self.model, tf.keras.Model):
             return self.model(input, training=False)
